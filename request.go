@@ -39,7 +39,9 @@ func (r *request) Decode(v interface{}) (err error) {
 			return
 		}
 
-		err = fmt.Errorf("failed to close HTTP request body: %w", errClose)
+		if errClose != nil {
+			err = fmt.Errorf("failed to close HTTP request body: %w", errClose)
+		}
 	}()
 
 	decoder := json.NewDecoder(r.httpRequest.Body)
