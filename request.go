@@ -2,34 +2,22 @@ package rest
 
 import (
 	"encoding/json"
-	"fmt"
+	"github.com/AlexanderFadeev/myerrors"
 	"net/http"
-	"net/url"
 )
 
 type Request interface {
-	Method() string
-	URL() *url.URL
 	Decode(v interface{}) error
-	// TODO: add more methods
 }
 
 type request struct {
 	httpRequest *http.Request
 }
 
-func (r *request) Method() string {
-	return r.httpRequest.Method
-}
-
-func (r *request) URL() *url.URL {
-	return r.httpRequest.URL
-}
-
 func (r *request) Decode(v interface{}) (err error) {
 	defer func() {
 		if err != nil {
-			err = fmt.Errorf("failed to decode request: %w", err)
+			err = myerrors.Wrap(err, "failed to decode request")
 		}
 	}()
 
@@ -40,14 +28,14 @@ func (r *request) Decode(v interface{}) (err error) {
 		}
 
 		if errClose != nil {
-			err = fmt.Errorf("failed to close HTTP request body: %w", errClose)
+			err = myerrors.Wrap(errClose, "failed to close HTTP request body")
 		}
 	}()
 
 	decoder := json.NewDecoder(r.httpRequest.Body)
 	err = decoder.Decode(v)
 	if err != nil {
-		return fmt.Errorf("failed to decode JSON body: %w", err)
+		return myerrors.Wrap(err, "failed to decode JSON body")
 	}
 
 	return nil

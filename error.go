@@ -2,7 +2,7 @@ package rest
 
 import (
 	"encoding/json"
-	"fmt"
+	"github.com/AlexanderFadeev/myerrors"
 	"io"
 )
 
@@ -38,7 +38,7 @@ func (e *errorImpl) Encode(w io.Writer) error {
 	encoder := json.NewEncoder(w)
 	err := encoder.Encode(result)
 	if err != nil {
-		return fmt.Errorf("failed to encode to JSON: %w", err)
+		return myerrors.Wrap(err, "failed to encode to JSON")
 	}
 
 	return nil
