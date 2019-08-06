@@ -34,7 +34,7 @@ func TestWrapGenericHandlers(t *testing.T) {
 	errChan := make(chan error)
 
 	for _, gh := range genericHandlers {
-		WrapGenericHandler(gh, new(mockErrorTranslator), errChan)
+		MustWrapGenericHandler(gh, new(mockErrorTranslator), errChan)
 	}
 }
 
@@ -47,8 +47,8 @@ func TestWrapBadGenericHandlers(t *testing.T) {
 				recover()
 			}()
 
-			WrapGenericHandler(gh, new(mockErrorTranslator), errChan)
-			assert.Failf(t, "WrapGenerichandler should panic", "handler index %d", index)
+			MustWrapGenericHandler(gh, new(mockErrorTranslator), errChan)
+			assert.Failf(t, "MustWrapGenerichandler should panic", "handler index %d", index)
 		}()
 	}
 }
@@ -69,7 +69,7 @@ func TestCallGenericWrapper(t *testing.T) {
 		return &reply{a.X}, nil
 	}
 
-	wrapped := WrapGenericHandler(handler, mockErrorTranslator{}, nil)
+	wrapped := MustWrapGenericHandler(handler, mockErrorTranslator{}, nil)
 
 	body := []byte(`{"X": 42}`)
 	bodyBuf := bytes.NewBuffer(body)

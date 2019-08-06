@@ -16,23 +16,23 @@ type (
 
 var errorInterface = reflect.TypeOf((*error)(nil)).Elem()
 
-func WrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslator, errChan chan<- error) http.HandlerFunc {
+func WrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslator, errChan chan<- error) (http.HandlerFunc, error) {
 	rv := reflect.ValueOf(genericHandler)
 	rt := rv.Type()
 	if rk := rt.Kind(); rk != reflect.Func {
-		panic(myerrors.Errorf("expected function, got %s", rk.String()))
+		return nil, myerrors.Errorf("expected function, got %s", rk.String())
 	}
 
 	if numIn := rt.NumIn(); numIn != 1 {
-		panic(myerrors.Errorf("expected function with 1 argument, got %d", numIn))
+		return nil, myerrors.Errorf("expected function with 1 argument, got %d", numIn)
 	}
 
 	if numOut := rt.NumOut(); numOut != 2 {
-		panic(myerrors.Errorf("expected function with 2 return values, got %d)", numOut))
+		return nil, myerrors.Errorf("expected function with 2 return values, got %d)", numOut)
 	}
 
 	if !rt.Out(1).Implements(errorInterface) {
-		panic(myerrors.Errorf("expected second return value to implement error interface, got %s", rt.Out(1).Name()))
+		return nil, myerrors.Errorf("expected second return value to implement error interface, got %s", rt.Out(1).Name())
 	}
 
 	handler := func(req Request) Reply {
@@ -52,7 +52,15 @@ func WrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslato
 		return NewOKReply(out)
 	}
 
-	return WrapHandler(handler, errChan)
+	return WrapHandler(handler, errChan), nil
+}
+
+func MustWrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslator, errChan chan<- error) http.HandlerFunc {
+	handler, err := WrapGenericHandler(genericHandler, translator, errChan)
+	if err != nil {
+		panic(err.Error())
+	}
+	return handler
 }
 
 func WrapHandler(handler Handler, errChan chan<- error) http.HandlerFunc {

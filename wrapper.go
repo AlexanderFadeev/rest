@@ -8,7 +8,8 @@ type Wrapper interface {
 
 type GenericWrapper interface {
 	Wrapper
-	WrapGenericHandler(GenericHandler) http.HandlerFunc
+	WrapGenericHandler(GenericHandler) (http.HandlerFunc, error)
+	MustWrapGenericHandler(GenericHandler) http.HandlerFunc
 }
 
 type wrapper struct {
@@ -33,6 +34,10 @@ func (w *wrapper) WrapHandler(handler Handler) http.HandlerFunc {
 	return WrapHandler(handler, w.errChan)
 }
 
-func (w *wrapper) WrapGenericHandler(handler GenericHandler) http.HandlerFunc {
+func (w *wrapper) WrapGenericHandler(handler GenericHandler) (http.HandlerFunc, error) {
 	return WrapGenericHandler(handler, w.translator, w.errChan)
+}
+
+func (w *wrapper) MustWrapGenericHandler(handler GenericHandler) http.HandlerFunc {
+	return MustWrapGenericHandler(handler, w.translator, w.errChan)
 }
