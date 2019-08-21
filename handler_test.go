@@ -30,16 +30,22 @@ func (mockErrorTranslator) TranslateError(err error) Error {
 	return NewError(err, http.StatusInternalServerError)
 }
 
+type mockErrorHandler struct{}
+
+func (mockErrorHandler) Handle(err error) {
+	panic(err.Error())
+}
+
 func TestWrapGenericHandlers(t *testing.T) {
-	errChan := make(chan error)
+	errHandler := new(mockErrorHandler)
 
 	for _, gh := range genericHandlers {
-		MustWrapGenericHandler(gh, new(mockErrorTranslator), errChan)
+		MustWrapGenericHandler(gh, new(mockErrorTranslator), errHandler)
 	}
 }
 
 func TestWrapBadGenericHandlers(t *testing.T) {
-	errChan := make(chan error)
+	errHandler := new(mockErrorHandler)
 
 	for index, gh := range badGenericHandlers {
 		func() {
@@ -47,7 +53,7 @@ func TestWrapBadGenericHandlers(t *testing.T) {
 				recover()
 			}()
 
-			MustWrapGenericHandler(gh, new(mockErrorTranslator), errChan)
+			MustWrapGenericHandler(gh, new(mockErrorTranslator), errHandler)
 			assert.Failf(t, "MustWrapGenerichandler should panic", "handler index %d", index)
 		}()
 	}

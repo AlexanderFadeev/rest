@@ -16,7 +16,7 @@ type (
 
 var errorInterface = reflect.TypeOf((*error)(nil)).Elem()
 
-func WrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslator, errChan chan<- error) (http.HandlerFunc, error) {
+func WrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslator, errHandler myerrors.Handler) (http.HandlerFunc, error) {
 	rv := reflect.ValueOf(genericHandler)
 	rt := rv.Type()
 	if rk := rt.Kind(); rk != reflect.Func {
@@ -52,24 +52,25 @@ func WrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslato
 		return NewOKReply(out)
 	}
 
-	return WrapHandler(handler, errChan), nil
+	return WrapHandler(handler, errHandler), nil
 }
 
-func MustWrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslator, errChan chan<- error) http.HandlerFunc {
-	handler, err := WrapGenericHandler(genericHandler, translator, errChan)
+func MustWrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslator, errHandler myerrors.Handler) http.HandlerFunc {
+	handler, err := WrapGenericHandler(genericHandler, translator, errHandler)
 	if err != nil {
 		panic(err.Error())
 	}
 	return handler
 }
 
-func WrapHandler(handler Handler, errChan chan<- error) http.HandlerFunc {
+func WrapHandler(handler Handler, errHandler myerrors.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request := request{httpRequest: r}
 		reply := handler(&request)
 		err := encodeReply(w, reply)
 		if err != nil {
-			errChan <- myerrors.Wrap(err, "failed to handle HTTP request")
+			err = myerrors.Wrap(err, "failed to handle HTTP request")
+			errHandler.Handle(err)
 		}
 	}
 }

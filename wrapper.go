@@ -1,6 +1,9 @@
 package rest
 
-import "net/http"
+import (
+	"github.com/AlexanderFadeev/myerrors"
+	"net/http"
+)
 
 type Wrapper interface {
 	WrapHandler(Handler) http.HandlerFunc
@@ -13,31 +16,31 @@ type GenericWrapper interface {
 }
 
 type wrapper struct {
-	errChan    chan<- error
+	errHandler myerrors.Handler
 	translator ErrorTranslator
 }
 
-func NewWrapper(errChan chan<- error) Wrapper {
+func NewWrapper(errHandler myerrors.Handler) Wrapper {
 	return &wrapper{
-		errChan: errChan,
+		errHandler: errHandler,
 	}
 }
 
-func NewGenericWrapper(translator ErrorTranslator, errChan chan<- error) GenericWrapper {
+func NewGenericWrapper(translator ErrorTranslator, errHandler myerrors.Handler) GenericWrapper {
 	return &wrapper{
-		errChan:    errChan,
+		errHandler: errHandler,
 		translator: translator,
 	}
 }
 
 func (w *wrapper) WrapHandler(handler Handler) http.HandlerFunc {
-	return WrapHandler(handler, w.errChan)
+	return WrapHandler(handler, w.errHandler)
 }
 
 func (w *wrapper) WrapGenericHandler(handler GenericHandler) (http.HandlerFunc, error) {
-	return WrapGenericHandler(handler, w.translator, w.errChan)
+	return WrapGenericHandler(handler, w.translator, w.errHandler)
 }
 
 func (w *wrapper) MustWrapGenericHandler(handler GenericHandler) http.HandlerFunc {
-	return MustWrapGenericHandler(handler, w.translator, w.errChan)
+	return MustWrapGenericHandler(handler, w.translator, w.errHandler)
 }
