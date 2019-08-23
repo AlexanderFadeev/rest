@@ -2,7 +2,6 @@ package rest
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/AlexanderFadeev/myerrors"
 	"io"
 	"net/http"
@@ -39,6 +38,7 @@ func WrapGenericHandler(genericHandler GenericHandler, translator ErrorTranslato
 		in := reflect.New(rt.In(0).Elem())
 		err := req.Decode(in.Interface())
 		if err != nil {
+			err = myerrors.Wrap(err, "failed to decode request")
 			return NewError(err, http.StatusBadRequest)
 		}
 
@@ -81,7 +81,7 @@ func encodeReply(w http.ResponseWriter, reply Reply) error {
 	err := reply.Encode(&buf)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		return fmt.Errorf("failed to encode reply")
+		return myerrors.Errorf("failed to encode reply")
 	}
 
 	w.WriteHeader(reply.StatusCode())
