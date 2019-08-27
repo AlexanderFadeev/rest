@@ -38,16 +38,7 @@ func (r *request) Decode(v interface{}) error {
 }
 
 func (r *request) decodeBody(v interface{}) (err error) {
-	defer func() {
-		errClose := r.httpRequest.Body.Close()
-		if err != nil {
-			return
-		}
-
-		if errClose != nil {
-			err = myerrors.Wrap(errClose, "failed to close HTTP request body")
-		}
-	}()
+	defer myerrors.CallWrapd(&err, r.httpRequest.Body.Close, "failed to close HTTP request body")
 
 	decoder := json.NewDecoder(r.httpRequest.Body)
 	err = decoder.Decode(v)
