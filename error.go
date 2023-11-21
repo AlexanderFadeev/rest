@@ -1,45 +1,21 @@
 package rest
 
-import (
-	"encoding/json"
-	"github.com/AlexanderFadeev/myerrors"
-	"io"
-)
-
-const errorKey = "error"
-
-type Error interface {
-	error
-	Reply
+type ErrorTranslator interface {
+	TranslateError(error) uint
 }
 
-type errorImpl struct {
-	error
+type ErrorTranslatorFunc func(error) uint
 
-	statusCode int
+func (f ErrorTranslatorFunc) TranslateError(err error) uint {
+	return f(err)
 }
 
-func NewError(err error, statusCode int) Error {
-	return &errorImpl{
-		error:      err,
-		statusCode: statusCode,
-	}
+type ErrorHandler interface {
+	HandleError(error)
 }
 
-func (e *errorImpl) StatusCode() int {
-	return e.statusCode
-}
+type ErrorHandlerFunc func(error)
 
-func (e *errorImpl) Encode(w io.Writer) error {
-	result := map[string]string{
-		errorKey: e.Error(),
-	}
-
-	encoder := json.NewEncoder(w)
-	err := encoder.Encode(result)
-	if err != nil {
-		return myerrors.Wrap(err, "failed to encode to JSON")
-	}
-
-	return nil
+func (f ErrorHandlerFunc) HandleError(err error) {
+	f(err)
 }

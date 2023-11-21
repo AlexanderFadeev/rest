@@ -1,12 +1,15 @@
 package rest
 
 import (
-	"encoding/json"
-	"github.com/AlexanderFadeev/myerrors"
+	"io"
+	"net/http"
+	"net/url"
+
+	"github.com/afadeevz/omnierrors"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
+	"github.com/mailru/easyjson"
 	"github.com/mitchellh/mapstructure"
-	"net/http"
 )
 
 const (
@@ -15,56 +18,51 @@ const (
 )
 
 type Request interface {
-	Decode(v interface{}) error
+	easyjson.Unmarshaler
 }
 
-type request struct {
-	httpRequest *http.Request
+type PtrToRequest[T any] interface {
+	Request
+	*T
 }
 
-func (r *request) Decode(v interface{}) error {
-	err := r.decodeBody(v)
+func decodeRequest(httpReq *http.Request, req Request) error {
+	err := decodeBody(httpReq.Body, req)
 	if err != nil {
-		return myerrors.Wrap(err, "failed to decode request body")
+		return omnierrors.Wrap(err, "failed to decode request body")
 	}
 
-	err = r.decodeQueryString(v)
+	err = decodeQueryString(httpReq.URL.Query(), req)
 	if err != nil {
-		return myerrors.Wrap(err, "failed to decode query strings")
+		return omnierrors.Wrap(err, "failed to decode query strings")
 	}
 
-	err = r.decodeURLParams(v)
-	return myerrors.Wrap(err, "failed to decode URL params")
+	vars := mux.Vars(httpReq)
+	err = decodeURLParams(vars, req)
+	return omnierrors.Wrap(err, "failed to decode URL params")
 }
 
-func (r *request) decodeBody(v interface{}) (err error) {
-	defer myerrors.CallWrapd(&err, r.httpRequest.Body.Close, "failed to close HTTP request body")
-
-	decoder := json.NewDecoder(r.httpRequest.Body)
-	err = decoder.Decode(v)
-	if err != nil {
-		return myerrors.Wrap(err, "failed to decode JSON body")
-	}
-	return nil
+func decodeBody(body io.Reader, req Request) error {
+	err := easyjson.UnmarshalFromReader(body, req)
+	return omnierrors.Wrap(err, "failed to decode JSON body")
 }
 
-func (r *request) decodeQueryString(v interface{}) error {
+func decodeQueryString(query url.Values, req Request) error {
 	decoder := schema.NewDecoder()
 	decoder.SetAliasTag(queryTag)
-	return decoder.Decode(v, r.httpRequest.URL.Query())
+	return decoder.Decode(req, query)
 }
 
-func (r *request) decodeURLParams(v interface{}) error {
+func decodeURLParams(vars map[string]string, req Request) error {
 	conf := &mapstructure.DecoderConfig{
 		WeaklyTypedInput: true,
 		TagName:          urlTag,
-		Result:           v,
+		Result:           req,
 	}
 	decoder, err := mapstructure.NewDecoder(conf)
 	if err != nil {
-		return myerrors.Wrap(err, "failed to create new decoder")
+		return omnierrors.Wrap(err, "failed to create new decoder")
 	}
 
-	vars := mux.Vars(r.httpRequest)
 	return decoder.Decode(vars)
 }

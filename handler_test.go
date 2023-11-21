@@ -1,95 +1,122 @@
-package rest
+package rest_test
 
 import (
 	"bytes"
-	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/afadeevz/omnierrors"
+	"github.com/afadeevz/rest"
+	"github.com/mailru/easyjson"
+	"github.com/stretchr/testify/assert"
 )
 
-type emptyStruct struct{}
-
-var genericHandlers = []GenericHandler{
-	func(*emptyStruct) (*emptyStruct, error) { return nil, nil },
+//easyjson:json
+type SetReq struct {
+	Key   int `json:"key"`
+	Value int `json:"value"`
 }
 
-var badGenericHandlers = []GenericHandler{
-	func() (*emptyStruct, error) { return nil, nil },
-	func() (*emptyStruct, *emptyStruct) { return nil, nil },
-	func(*emptyStruct) error { return nil },
-	func(*emptyStruct) *emptyStruct { return nil },
-	func(*emptyStruct) (*emptyStruct, *emptyStruct) { return nil, nil },
-	42,
+//easyjson:json
+type SetResp struct{}
+
+//easyjson:json
+type GetReq struct {
+	Key int `json:"key"`
 }
 
-type mockErrorTranslator struct{}
-
-func (mockErrorTranslator) TranslateError(err error) Error {
-	return NewError(err, http.StatusInternalServerError)
+//easyjson:json
+type GetResp struct {
+	Value int `json:"value"`
 }
 
-type mockErrorHandler struct{}
-
-func (mockErrorHandler) Handle(err error) {
-	panic(err.Error())
+//easyjson:json
+type ErrorResp struct {
+	Error string `json:"error"`
 }
 
-func TestWrapGenericHandlers(t *testing.T) {
-	errHandler := new(mockErrorHandler)
+type stubHandler struct {
+	data map[int]int
+}
 
-	for _, gh := range genericHandlers {
-		MustWrapGenericHandler(gh, new(mockErrorTranslator), errHandler)
+func newStubHandler() *stubHandler {
+	return &stubHandler{
+		data: make(map[int]int),
 	}
 }
 
-func TestWrapBadGenericHandlers(t *testing.T) {
-	errHandler := new(mockErrorHandler)
+var (
+	errNotFound      = omnierrors.New("not found")
+	errAlreadyExists = omnierrors.New("already exists")
+)
 
-	for index, gh := range badGenericHandlers {
-		func() {
-			defer func() {
-				recover()
-			}()
-
-			MustWrapGenericHandler(gh, new(mockErrorTranslator), errHandler)
-			assert.Failf(t, "MustWrapGenerichandler should panic", "handler index %d", index)
-		}()
+func (mh *stubHandler) Set(req *SetReq) (*SetResp, error) {
+	if _, ok := mh.data[req.Key]; ok {
+		return nil, errAlreadyExists
 	}
+
+	mh.data[req.Key] = req.Value
+	return &SetResp{}, nil
+}
+
+func (mh *stubHandler) Get(req *GetReq) (*GetResp, error) {
+	if _, ok := mh.data[req.Key]; !ok {
+		return nil, errNotFound
+	}
+
+	return &GetResp{
+		Value: mh.data[req.Key],
+	}, nil
+}
+
+func translateError(err error) uint {
+	switch {
+	case omnierrors.Is(err, errNotFound):
+		return http.StatusNotFound
+	case omnierrors.Is(err, errAlreadyExists):
+		return http.StatusConflict
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
+func handleError(error) {
+	// ignore
 }
 
 func TestCallGenericWrapper(t *testing.T) {
-	called := false
+	handler := newStubHandler()
+	et := rest.ErrorTranslatorFunc(translateError)
+	eh := rest.ErrorHandlerFunc(handleError)
 
-	type args struct {
-		X int
-	}
-	type reply struct {
-		X int
-	}
+	set := rest.Wrap(handler.Set, et, eh)
+	get := rest.Wrap(handler.Get, et, eh)
 
-	handler := func(a *args) (*reply, error) {
-		called = true
-		assert.Equal(t, 42, a.X)
-		return &reply{a.X}, nil
-	}
+	k := 42
+	v := 69
 
-	wrapped := MustWrapGenericHandler(handler, mockErrorTranslator{}, nil)
+	checkHandler(t, get, GetReq{Key: k}, ErrorResp{"failed to handle REST request: not found"}, http.StatusNotFound)
+	checkHandler(t, set, SetReq{Key: k, Value: v}, SetResp{}, http.StatusOK)
+	checkHandler(t, set, SetReq{Key: k, Value: v}, ErrorResp{"failed to handle REST request: already exists"}, http.StatusConflict)
+	checkHandler(t, get, GetReq{Key: k}, GetResp{Value: v}, http.StatusOK)
+}
 
-	body := []byte(`{"X": 42}`)
-	bodyBuf := bytes.NewBuffer(body)
+func checkHandler(t *testing.T, handler http.HandlerFunc, req easyjson.Marshaler, resp easyjson.Marshaler, status int) {
+	var bodyBuf bytes.Buffer
+	_, err := easyjson.MarshalToWriter(req, &bodyBuf)
+	assert.Nil(t, err)
+
 	w := httptest.NewRecorder()
-	r, err := http.NewRequest(http.MethodGet, "/test", bodyBuf)
+	r, err := http.NewRequest(http.MethodGet, "/test", &bodyBuf)
 	assert.Nil(t, err)
 
-	wrapped.ServeHTTP(w, r)
-	assert.True(t, called)
-	assert.Equal(t, http.StatusOK, w.Code)
+	handler(w, r)
+	assert.Equal(t, status, w.Code)
 
-	var replyMap map[string]interface{}
-	d := json.NewDecoder(w.Body)
-	err = d.Decode(&replyMap)
+	var respBuf bytes.Buffer
+	_, err = easyjson.MarshalToWriter(resp, &respBuf)
 	assert.Nil(t, err)
-	assert.Equal(t, map[string]interface{}{"X": 42.}, replyMap)
+
+	assert.Equal(t, respBuf.String(), w.Body.String())
 }
