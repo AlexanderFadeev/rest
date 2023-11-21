@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"io"
 	"net/http"
 	"net/url"
 
@@ -27,7 +26,7 @@ type PtrToRequest[T any] interface {
 }
 
 func decodeRequest(httpReq *http.Request, req Request) error {
-	err := decodeBody(httpReq.Body, req)
+	err := decodeBody(httpReq, req)
 	if err != nil {
 		return omnierrors.Wrap(err, "failed to decode request body")
 	}
@@ -42,8 +41,12 @@ func decodeRequest(httpReq *http.Request, req Request) error {
 	return omnierrors.Wrap(err, "failed to decode URL params")
 }
 
-func decodeBody(body io.Reader, req Request) error {
-	err := easyjson.UnmarshalFromReader(body, req)
+func decodeBody(httpReq *http.Request, req Request) error {
+	if httpReq.ContentLength == 0 {
+		return nil
+	}
+
+	err := easyjson.UnmarshalFromReader(httpReq.Body, req)
 	return omnierrors.Wrap(err, "failed to decode JSON body")
 }
 
