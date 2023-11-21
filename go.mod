@@ -1,4 +1,4 @@
-module github.com/afadeevz/rest
+module github.com/afadeevz/rest/v2
 
 go 1.21.4
 
