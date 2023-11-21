@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/afadeevz/omnierrors"
-	"github.com/afadeevz/rest"
+	"github.com/afadeevz/rest/v2"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 )
