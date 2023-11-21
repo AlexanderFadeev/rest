@@ -1,4 +1,4 @@
-module github.com/AlexanderFadeev/rest
+module github.com/afadeevz/rest
 
 go 1.13
 
