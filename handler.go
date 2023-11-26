@@ -2,6 +2,7 @@ package rest
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/mailru/easyjson"
 )
 
-type Handler[Req any, Resp any, ReqPtr PtrToRequest[Req], RespPtr PtrToResponse[Resp]] func(*Req) (*Resp, error)
+type Handler[Req any, Resp any, ReqPtr PtrToRequest[Req], RespPtr PtrToResponse[Resp]] func(context.Context, *Req) (*Resp, error)
 
 func (h Handler[Req, Rep, ReqPtr, RespPtr]) ToHTTPHandler(errTranslator ErrorTranslator, errHandler ErrorHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -20,7 +21,7 @@ func (h Handler[Req, Rep, ReqPtr, RespPtr]) ToHTTPHandler(errTranslator ErrorTra
 				return nil, omnierrors.Wrap(err, "failed to decode REST request")
 			}
 
-			resp, err := h(req)
+			resp, err := h(r.Context(), req)
 			if err != nil {
 				return nil, omnierrors.Wrap(err, "failed to handle REST request")
 			}

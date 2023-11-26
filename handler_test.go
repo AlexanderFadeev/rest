@@ -2,6 +2,7 @@ package rest_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -51,7 +52,7 @@ var (
 	errAlreadyExists = omnierrors.New("already exists")
 )
 
-func (mh *stubHandler) Set(req *SetReq) (*SetResp, error) {
+func (mh *stubHandler) Set(_ context.Context, req *SetReq) (*SetResp, error) {
 	if _, ok := mh.data[req.Key]; ok {
 		return nil, errAlreadyExists
 	}
@@ -60,7 +61,7 @@ func (mh *stubHandler) Set(req *SetReq) (*SetResp, error) {
 	return &SetResp{}, nil
 }
 
-func (mh *stubHandler) Get(req *GetReq) (*GetResp, error) {
+func (mh *stubHandler) Get(_ context.Context, req *GetReq) (*GetResp, error) {
 	if _, ok := mh.data[req.Key]; !ok {
 		return nil, errNotFound
 	}
